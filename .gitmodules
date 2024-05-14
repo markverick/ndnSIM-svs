@@ -6,3 +6,6 @@ branch = NFD-0.7.0-ndnSIM
 	path = ndn-cxx
 	url = https://github.com/named-data-ndnSIM/ndn-cxx
 	branch = ndn-cxx-0.7.0-ndnSIM
+[submodule "ndn-svs-dev"]
+	path = ndn-svs
+	url = git@github.com:markverick/ndn-svs-dev.git

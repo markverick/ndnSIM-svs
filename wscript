@@ -75,6 +75,7 @@ def configure(conf):
 
     conf.write_config_header('../../ns3/ndnSIM/ndn-cxx/detail/config.hpp', define_prefix='NDN_CXX_', remove=False)
     conf.write_config_header('../../ns3/ndnSIM/NFD/core/config.hpp', remove=False)
+    conf.write_config_header('../../ns3/ndnSIM/ndn-svs/config.hpp', define_prefix='NDN_SVS_', remove=False)
 
 def build(bld):
     (base, build, VERSION_SPLIT) = bld.getVersion('NFD')
@@ -104,6 +105,12 @@ def build(bld):
         VERSION_MAJOR=str(vmajor),
         VERSION_MINOR=str(vminor),
         VERSION_PATCH=str(vpatch))
+
+    bld(features='subst',
+        source='ndn-svs/libndn-svs.pc.in',
+        target='version-SVS',
+        install_path='${LIBDIR}/pkgconfig',
+        VERSION='0.1.0')
 
     bld.objects(
         features="cxx",
@@ -152,13 +159,15 @@ def build(bld):
                                      'NFD/daemon/face/*udp*',
                                      'NFD/daemon/face/unix-stream*',
                                      'NFD/daemon/face/websocket*'])
+    
+    ndnSvsSrc = bld.path.ant_glob('ndn-svs/ndn-svs/**/*.cpp')
 
     module = bld.create_ns3_module('ndnSIM', deps)
     module.module = 'ndnSIM'
     module.features += ' ns3fullmoduleheaders ndncxxheaders'
-    module.use += ['version-ndn-cxx', 'version-NFD-objects', 'BOOST', 'SQLITE3', 'RT', 'PTHREAD', 'OPENSSL']
-    module.includes = ['../..', '../../ns3/ndnSIM/NFD', './NFD/core', './NFD/daemon', './NFD/rib', '../../ns3/ndnSIM', '../../ns3/ndnSIM/ndn-cxx']
-    module.export_includes = ['../../ns3/ndnSIM/NFD', './NFD/core', './NFD/daemon', './NFD/rib', '../../ns3/ndnSIM']
+    module.use += ['version-SVS', 'version-ndn-cxx', 'version-NFD-objects', 'BOOST', 'SQLITE3', 'RT', 'PTHREAD', 'OPENSSL']
+    module.includes = ['../..', '../../ns3/ndnSIM/ndn-svs', '../../ns3/ndnSIM/NFD', './NFD/core', './NFD/daemon', './NFD/rib', '../../ns3/ndnSIM', '../../ns3/ndnSIM/ndn-cxx']
+    module.export_includes = ['../../ns3/ndnSIM/ndn-svs', '../../ns3/ndnSIM/NFD', './NFD/core', './NFD/daemon', './NFD/rib', '../../ns3/ndnSIM']
     if 'ns3-visualizer' in bld.env['NS3_ENABLED_MODULES']:
         module.defines = ['HAVE_NS3_VISUALIZER=1']
 
@@ -173,7 +182,7 @@ def build(bld):
     module_dirs = ['apps', 'helper', 'model', 'utils', 'bindings']
     module.source = bld.path.ant_glob(['%s/**/*.cpp' % dir for dir in module_dirs],
                                       excl=[
-                                          'model/ip-faces/*']) + ndnCxxSrc + nfdSrc
+                                          'model/ip-faces/*']) + ndnCxxSrc + nfdSrc + ndnSvsSrc
 
     module_dirs = ['NFD/core', 'NFD/daemon', 'apps', 'helper', 'model', 'utils', 'bindings']
     module.full_headers = bld.path.ant_glob(['%s/**/*.hpp' % dir for dir in module_dirs])
@@ -181,6 +190,8 @@ def build(bld):
 
     module.ndncxx_headers = bld.path.ant_glob(['ndn-cxx/ndn-cxx/**/*.hpp'],
                                               excl=['src/**/*-osx.hpp', 'src/impl/**/*'])
+
+    module.ndnsvs_headers = bld.path.ant_glob(['ndn-svs/ndn-svs/*.hpp'])
 
     if bld.env.ENABLE_EXAMPLES:
         bld.recurse('examples')
@@ -219,6 +230,7 @@ def apply_ns3fullmoduleheaders(self):
 def apply_ndnsim_moduleheaders(self):
     # ## get all of the ns3 headers
     ndncxx_dir_node = self.bld.path.find_or_declare("ns3/ndnSIM/ndn-cxx")
+    ndnsvs_dir_node = self.bld.path.find_or_declare("ns3/ndnSIM/ndn-svs")
 
     mode = getattr(self, "mode", "install")
 
@@ -232,6 +244,22 @@ def apply_ndnsim_moduleheaders(self):
         task.mode = getattr(self, 'mode', 'install')
         if task.mode == 'install':
             self.bld.install_files('${INCLUDEDIR}/%s%s/ns3/ndnSIM/ndn-cxx/%s' % (wutils.APPNAME, wutils.VERSION, relpath),
+                                   [src_node])
+            task.set_inputs([src_node])
+            task.set_outputs([dst_node])
+        else:
+            task.header_to_remove = dst_node
+    
+    for src_node in set(self.ndnsvs_headers):
+        dst_node = ndnsvs_dir_node.find_or_declare(src_node.path_from(self.bld.path.find_dir('src/ndnSIM/ndn-svs/ndn-svs')))
+        assert dst_node is not None
+
+        relpath = src_node.parent.path_from(self.bld.path.find_dir('src/ndnSIM/ndn-svs/ndn-svs'))
+
+        task = self.create_task('ns3header')
+        task.mode = getattr(self, 'mode', 'install')
+        if task.mode == 'install':
+            self.bld.install_files('${INCLUDEDIR}/%s%s/ns3/ndnSIM/ndn-svs/%s' % (wutils.APPNAME, wutils.VERSION, relpath),
                                    [src_node])
             task.set_inputs([src_node])
             task.set_outputs([dst_node])
